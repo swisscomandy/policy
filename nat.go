@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net"
-
+        "strings"
 	"os/exec"
 
 	"fmt"
-        "strings"
 	"code.cloudfoundry.org/garden-linux/sysconfig"
 	"github.com/cloudfoundry/gunk/command_runner"
 	"code.cloudfoundry.org/lager"
@@ -36,16 +35,16 @@ func (mgr *natChain) Setup(containerID, bridgeName string, ip net.IP, network *n
 		// Bind nat instance chain to nat prerouting chain
 		exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PreroutingChain, "--jump", instanceChain),
 	}
-
-	if strings.EqualFold(network.IP.String(),ip.String()) {
-
-	} else {
-	       commands = append(commands, exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "tcp", "-s", ip.String(), "-j", "SNAT", "--to", externalIp.String()+":"+portRange),
-			exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "udp", "-s", ip.String(), "-j", "SNAT", "--to", externalIp.String()+":"+portRange),
-			exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "icmp", "-s", ip.String(), "-j", "MASQUERADE"))
+        condition := "-A w--postrouting -s "+ network.String() +" -p udp -j SNAT --to-source "+ externalIp.String() +":"+ portRange
+        if isNewRule(condition) {
+	       commands = append(commands, exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "tcp", "-s", network.String(), "-j", "SNAT", "--to", externalIp.String()+":"+portRange),
+			exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "udp", "-s", network.String(), "-j", "SNAT", "--to", externalIp.String()+":"+portRange),
+			exec.Command("iptables", "--wait", "--table", "nat", "-A", mgr.cfg.PostroutingChain, "--protocol", "icmp", "-s", network.String(), "-j", "MASQUERADE"))
 	}
     
 	for _, cmd := range commands {
+                logger1 := mgr.logger.Session("wwwwwwwwwwwwwwwww", lager.Data{"cmd": cmd})
+                logger1.Debug("HHHHHHHHHHHHHHHHHHHH")
 		if err := mgr.runner.Run(cmd); err != nil {
 			buffer := &bytes.Buffer{}
 			cmd.Stderr = buffer
@@ -61,6 +60,16 @@ func (mgr *natChain) Setup(containerID, bridgeName string, ip net.IP, network *n
 	}
 
 	return nil
+}
+
+func isNewRule(condition string) bool {
+	out, _ := exec.Command("iptables-save", "-t", "nat").CombinedOutput()
+		for _, line := range strings.Split(string(out), "\n") {
+        	if strings.EqualFold(line, condition) {
+        		return false
+                	 }
+        	}
+	return true
 }
 
 func (mgr *natChain) Teardown(containerID string) error {
