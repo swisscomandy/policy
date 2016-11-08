@@ -353,8 +353,9 @@ func (c *LinuxContainer) Restore(snapshot linux_backend.LinuxContainerSpec) erro
 		c.processIDPool.Restore(process.ID)
 		c.processTracker.Restore(fmt.Sprintf("%d", process.ID), signaller)
 	}
-        //todo: figure out how to get the portrange 
-	if err := c.ipTablesManager.ContainerSetup(snapshot.ID, snapshot.Resources.Bridge, snapshot.Resources.Network.IP, snapshot.Resources.Network.Subnet, snapshot.Resources.ExternalIP, "49920-50175"); err != nil {
+        space , _ := c.Property("network.space_id")
+        portRange := GetPortRange(space) 
+	if err := c.ipTablesManager.ContainerSetup(snapshot.ID, snapshot.Resources.Bridge, snapshot.Resources.Network.IP, snapshot.Resources.Network.Subnet, snapshot.Resources.ExternalIP, portRange); err != nil {
 		cLog.Error("failed-to-reenforce-network-rules", err)
 		return err
 	}
